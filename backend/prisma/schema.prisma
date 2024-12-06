@@ -1,0 +1,160 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now())
+  name           String
+  username       String   @unique
+  email          String   @unique
+  password       String
+  profilePicture String   @default("")
+  bannerImg      String   @default("")
+  headline       String   @default("Linedin User")
+  location       String   @default("")
+  about          String   @default("")
+
+  skills      String[]     @default([])
+  experiences Experience[]
+  educations  Education[]
+
+  sentConnections     Connection[] @relation("sentConnections")
+  receivedConnections Connection[] @relation("receivedConnections")
+
+  posts    Post[]
+  likes    Like[]
+  comments Comment[]
+
+  sentNotifications     Notification[] @relation("SentNotfications")
+  receivedNotifications Notification[] @relation("ReceivedNotifications")
+}
+
+model Experience {
+  id        Int      @id @default(autoincrement())
+  title     String
+  startDate DateTime
+  endDate   DateTime
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Education {
+  id           Int    @id @default(autoincrement())
+  school       String
+  fieldOfStudy String
+  startYear    Int
+  endYear      Int
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Connection {
+  id         Int      @id @default(autoincrement())
+  senderId   String //the user initiating the connection
+  receiverId String //the connected user
+  status     Status   @default(PENDING)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("sentConnections", fields: [senderId], references: [id])
+  receiver User @relation("receivedConnections", fields: [receiverId], references: [id])
+}
+
+enum Status {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  content   String
+  image     String?
+  createdAt DateTime @default(now())
+
+  likes         Like[]
+  comments      Comment[]
+  notifications Notification[]
+
+  userId String
+  author User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postId Int
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+
+  postId Int
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  //comment reply
+  parentComment Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  parentId      Int?
+  replies       Comment[] @relation("CommentReplies")
+}
+
+model Notification {
+  id   Int              @id @default(autoincrement())
+  type NotificationType
+
+  //users who receives the notification
+  userId    String
+  recipient User   @relation("ReceivedNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// actors who triggered the notification 
+  actorId String
+  actor   User   @relation("SentNotfications", fields: [actorId], references: [id], onDelete: Cascade)
+
+  ////optional relations
+  postId Int?
+  post   Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  //  like      Like?            @relation(fields: [likeId], references: [id], onDelete: SetNull)
+  // likeId    String?
+
+  // comment   Comment?         @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  // commentId String?
+
+  // Content and status of notification
+  content String?
+  isRead  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum NotificationType {
+  Like
+  Comment
+  connectionAccepted
+}
